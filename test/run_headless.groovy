@@ -1,7 +1,7 @@
-// Headless end-to-end test for the MegaSeg Fiji plugin.
+// Headless end-to-end test for the SubCellSeg Fiji plugin.
 //
 //   ImageJ-win64.exe --headless --console --run test/run_headless.groovy \
-//      "input='D:/data/vol.tif',outdir='D:/tmp/out',python_env='C:/.../envs/cytodl-mini',channel=1"
+//      "input='D:/data/vol.tif',outdir='D:/tmp/out',python_env='C:/.../envs/subcellseg',channel=1"
 //
 #@ String input
 #@ String outdir
@@ -12,7 +12,7 @@
 
 import ij.IJ
 import ij.process.StackStatistics
-import org.allencell.megaseg.fiji.MegaSegCommand
+import org.allencell.subcellseg.fiji.SubCellSegCommand
 
 new File(outdir).mkdirs()
 def imp = IJ.openImage(input)
@@ -21,7 +21,7 @@ println("INPUT " + imp.getTitle() + " C=" + imp.getNChannels() + " Z=" + imp.get
         + " bits=" + imp.getBitDepth())
 
 long t0 = System.currentTimeMillis()
-def module = cmd.run(MegaSegCommand.class, true,
+def module = cmd.run(SubCellSegCommand.class, true,
         "imp", imp,
         "channel", channel,
         "output", "Mask + probability map",

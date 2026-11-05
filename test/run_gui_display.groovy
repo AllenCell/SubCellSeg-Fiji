@@ -2,7 +2,7 @@
 // and verify that result windows appear, then quit Fiji.
 //
 //   ImageJ-win64.exe --console --run test/run_gui_display.groovy \
-//      "input='D:/data/vol.tif',python_env='C:/.../envs/cytodl-mini'"
+//      "input='D:/data/vol.tif',python_env='C:/.../envs/subcellseg'"
 //
 #@ String input
 #@ String python_env
@@ -11,7 +11,7 @@
 
 import ij.IJ
 import ij.WindowManager
-import org.allencell.megaseg.fiji.MegaSegCommand
+import org.allencell.subcellseg.fiji.SubCellSegCommand
 
 def imp = IJ.openImage(input)
 imp.show()
@@ -21,7 +21,7 @@ int before = WindowManager.getImageCount()
 def inputs = [imp: imp, channel: 1, output: "Mask + probability map", threshold: 0.5d, min_size: 0,
               checkpoint: null, device: "auto", python_env: new File(python_env),
               headerMain: "", headerAdvanced: "", headerEnv: ""]
-cmd.run(MegaSegCommand.class, true, inputs).get()
+cmd.run(SubCellSegCommand.class, true, inputs).get()
 
 Thread.sleep(2000)
 int after = WindowManager.getImageCount()

@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-  Build MegaSeg_Fiji-<version>.jar without Maven, using the JDK bundled with Fiji.
+  Build SubCellSeg_Fiji-<version>.jar without Maven, using the JDK bundled with Fiji.
 
 .EXAMPLE
-  .\build.ps1                      # builds build\MegaSeg_Fiji-<version>.jar against C:\Fiji.app
+  .\build.ps1                      # builds build\SubCellSeg_Fiji-<version>.jar against C:\Fiji.app
   .\build.ps1 -Fiji D:\Fiji.app    # different Fiji location
   .\build.ps1 -Install             # also copies the jar into <Fiji>\plugins
 #>
@@ -54,14 +54,14 @@ if (-not (Test-Path $index)) {
 }
 
 # --- package
-$jarPath = Join-Path $build "MegaSeg_Fiji-$version.jar"
+$jarPath = Join-Path $build "SubCellSeg_Fiji-$version.jar"
 & $jar cf $jarPath -C $classes .
 if ($LASTEXITCODE -ne 0) { throw "jar failed" }
 Write-Host "Built $jarPath"
 
 if ($Install) {
     $plugins = Join-Path $Fiji "plugins"
-    Get-ChildItem $plugins -Filter "MegaSeg_Fiji-*.jar" -ErrorAction SilentlyContinue | Remove-Item -Force
+    Get-ChildItem $plugins -Filter "SubCellSeg_Fiji-*.jar" -ErrorAction SilentlyContinue | Remove-Item -Force
     Copy-Item $jarPath $plugins -Force
     Write-Host "Installed into $plugins (restart Fiji)"
 }

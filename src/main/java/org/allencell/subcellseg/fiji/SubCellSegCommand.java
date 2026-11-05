@@ -1,4 +1,4 @@
-package org.allencell.megaseg.fiji;
+package org.allencell.subcellseg.fiji;
 
 import ij.IJ;
 import ij.ImagePlus;
@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -27,16 +28,16 @@ import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
 
 /**
- * Fiji command that runs MegaSeg (generalist 3D intracellular-structure
+ * Fiji command that runs SubCellSeg (generalist 3D intracellular-structure
  * segmentation) on the active image.
  *
- * The heavy lifting happens in a Python process (cytodl-mini). This class only
- * exports the selected channel frame-by-frame as TIFF, calls the bridge script
- * and reads the results back as ImageJ hyperstacks.
+ * The heavy lifting happens in a Python process (the subcellseg package). This
+ * class only exports the selected channel frame-by-frame as TIFF, calls the
+ * bridge script and reads the results back as ImageJ hyperstacks.
  */
-@Plugin(type = Command.class, menuPath = "Plugins>Segmentation>MegaSeg...", headless = true,
-        description = "Segment intracellular structures in a 3D fluorescence volume with MegaSeg.")
-public class MegaSegCommand implements Command {
+@Plugin(type = Command.class, menuPath = "Plugins>Segmentation>SubCellSeg...", headless = true,
+        description = "Segment intracellular structures in a 3D fluorescence volume with SubCellSeg.")
+public class SubCellSegCommand implements Command {
 
     static final String OUT_MASK = "Mask";
     static final String OUT_PROB = "Probability map";
@@ -51,10 +52,10 @@ public class MegaSegCommand implements Command {
     @Parameter(label = "Image")
     private ImagePlus imp;
 
-    // ------------------------------------------------------------------ MegaSeg parameters
+    // ------------------------------------------------------------------ SubCellSeg parameters
 
     @Parameter(visibility = ItemVisibility.MESSAGE, persist = false)
-    private String headerMain = "<html><b>MegaSeg parameters</b></html>";
+    private String headerMain = "<html><b>SubCellSeg parameters</b></html>";
 
     @Parameter(label = "Channel to segment", min = "1",
             description = "1-based index of the structure channel. Ignored for single-channel images.")
@@ -65,11 +66,11 @@ public class MegaSegCommand implements Command {
     private String output = OUT_MASK;
 
     @Parameter(label = "Probability threshold", min = "0.05", max = "0.95", stepSize = "0.05",
-            description = "Voxels with probability >= threshold become foreground. 0.5 reproduces the paper.")
+            description = "Voxels with a probability above the threshold become foreground. 0.5 is the standard setting.")
     private double threshold = 0.5;
 
     @Parameter(label = "Minimum object size (voxels)", min = "0",
-            description = "Remove 3D connected components smaller than this many voxels (0 = keep all).")
+            description = "Remove 3D objects (voxels touching face to face) smaller than this many voxels (0 = keep all).")
     private int min_size = 0;
 
     // ------------------------------------------------------------------ Advanced options
@@ -78,7 +79,8 @@ public class MegaSegCommand implements Command {
     private String headerAdvanced = "<html><b>Advanced options</b></html>";
 
     @Parameter(label = "Model checkpoint", required = false, style = "open",
-            description = "Leave empty to use the default MegaSeg checkpoint (downloaded once to ~/.cache/cytodl-mini).")
+            description = "Leave empty to use the pretrained SubCellSeg model (downloaded once, on the first run). "
+                    + "Choose a file to use a model you fine-tuned yourself.")
     private File checkpoint;
 
     @Parameter(label = "Device", choices = {"auto", "gpu", "cpu"},
@@ -90,9 +92,10 @@ public class MegaSegCommand implements Command {
     @Parameter(visibility = ItemVisibility.MESSAGE, persist = false)
     private String headerEnv = "<html><b>Python environment</b> (remembered between runs)</html>";
 
-    @Parameter(label = "cytodl-mini environment", required = false, style = "both",
-            description = "Conda env / venv folder (or python executable) where cytodl-mini is installed. "
-                    + "Leave empty to use the MEGASEG_PYTHON environment variable or 'python' on the PATH.")
+    @Parameter(label = "Python environment", required = false, style = "both",
+            description = "Leave empty if you installed SubCellSeg with its standard instructions: it is found "
+                    + "automatically. Otherwise choose the conda env / venv folder (or python executable) where "
+                    + "the subcellseg package is installed.")
     private File python_env;
 
     // ------------------------------------------------------------------ Outputs
@@ -110,7 +113,7 @@ public class MegaSegCommand implements Command {
         final long t0 = System.currentTimeMillis();
         Path work = null;
         try {
-            work = Files.createTempDirectory("megaseg_fiji_");
+            work = Files.createTempDirectory("subcellseg_fiji_");
             runInternal(work);
             deleteRecursively(work);
             if (GraphicsEnvironment.isHeadless()) {
@@ -120,14 +123,14 @@ public class MegaSegCommand implements Command {
                 registerHeadless(mask);
             }
             final double secs = (System.currentTimeMillis() - t0) / 1000.0;
-            final String done = String.format("MegaSeg finished in %.1f s", secs);
+            final String done = String.format("SubCellSeg finished in %.1f s", secs);
             status.showStatus(done);
             log.info(done);
         } catch (final Exception e) {
-            status.showStatus("MegaSeg failed");
-            log.error("MegaSeg failed: " + e.getMessage(), e);
+            status.showStatus("SubCellSeg failed");
+            log.error("SubCellSeg failed: " + e.getMessage(), e);
             final String where = work == null ? "" : "\n\nTemporary files kept for inspection in:\n" + work;
-            IJ.error("MegaSeg", e.getMessage() + where);
+            IJ.error("SubCellSeg", e.getMessage() + where);
         }
     }
 
@@ -147,13 +150,13 @@ public class MegaSegCommand implements Command {
             throw new IllegalArgumentException("Channel " + ch + " requested but the image has only " + nC + " channel(s).");
         }
         if (nZ == 1) {
-            log.warn("MegaSeg is a 3D model. Running on a single 2D slice works but results may be poor.");
+            log.warn("SubCellSeg is a 3D model. Running on a single 2D slice works but results may be poor.");
         }
 
         // 1. Export the selected channel, one TIFF per time frame.
         final Path inDir = Files.createDirectories(work.resolve("in"));
         final Path outDir = Files.createDirectories(work.resolve("out"));
-        status.showStatus("MegaSeg: exporting " + nT + " frame(s)...");
+        status.showStatus("SubCellSeg: exporting " + nT + " frame(s)...");
         final ImageStack src = imp.getStack();
         for (int t = 1; t <= nT; t++) {
             final ImageStack stack = new ImageStack(imp.getWidth(), imp.getHeight());
@@ -167,7 +170,7 @@ public class MegaSegCommand implements Command {
         }
 
         // 2. Run the Python bridge.
-        final MegaSegRunner runner = new MegaSegRunner(log, status);
+        final SubCellSegRunner runner = new SubCellSegRunner(log, status);
         final String python = runner.resolvePython(python_env);
         final Path bridge = runner.extractBridge(work);
 
@@ -183,8 +186,6 @@ public class MegaSegCommand implements Command {
         cmd.add(device);
         cmd.add("--threshold");
         cmd.add(Double.toString(threshold));
-        cmd.add("--min-size");
-        cmd.add(Integer.toString(min_size));
         cmd.add("--outputs");
         cmd.add(wantMask && wantProb ? "mask,prob" : wantMask ? "mask" : "prob");
         if (checkpoint != null && !checkpoint.getPath().trim().isEmpty()) {
@@ -197,14 +198,136 @@ public class MegaSegCommand implements Command {
         runner.run(cmd, work);
 
         // 3. Read results back.
-        status.showStatus("MegaSeg: loading results...");
+        status.showStatus("SubCellSeg: loading results...");
         final String base = stripExtension(imp.getTitle());
         if (wantMask) {
-            mask = assemble(outDir, "mask", nT, nZ, base + "_MegaSeg_mask");
+            mask = assemble(outDir, "mask", nT, nZ, base + "_SubCellSeg_mask");
+            if (min_size > 0) {
+                status.showStatus("SubCellSeg: removing small objects...");
+                long removed = 0;
+                final ImageStack all = mask.getStack();
+                for (int t = 0; t < nT; t++) {
+                    removed += removeSmallObjects(all, t * nZ + 1, nZ, min_size);
+                }
+                log.info("[SubCellSeg] Removed " + removed + " object(s) smaller than " + min_size + " voxels");
+            }
         }
         if (wantProb) {
-            probability = assemble(outDir, "prob", nT, nZ, base + "_MegaSeg_prob");
+            probability = assemble(outDir, "prob", nT, nZ, base + "_SubCellSeg_prob");
         }
+    }
+
+    /**
+     * Remove foreground objects with fewer than {@code minSize} voxels from one 3D volume of an
+     * 8-bit stack, in place. An object is a group of non-zero voxels that touch face to face
+     * (6-connectivity). An object of exactly {@code minSize} voxels is kept.
+     *
+     * @param stack      8-bit stack; non-zero voxels are foreground
+     * @param firstSlice 1-based index of the first slice of the volume
+     * @param nZ         number of slices in the volume
+     * @param minSize    objects smaller than this are set to 0
+     * @return the number of objects removed
+     */
+    public static long removeSmallObjects(final ImageStack stack, final int firstSlice, final int nZ,
+            final int minSize) {
+        final int w = stack.getWidth();
+        final int h = stack.getHeight();
+        final byte[][] px = new byte[nZ][];
+        for (int z = 0; z < nZ; z++) {
+            final Object slice = stack.getPixels(firstSlice + z);
+            if (!(slice instanceof byte[])) {
+                throw new IllegalArgumentException("removeSmallObjects needs an 8-bit stack");
+            }
+            px[z] = (byte[]) slice;
+        }
+        // Each foreground voxel is visited once and marked SEEN when queued; at the end every
+        // SEEN voxel becomes 255 again. Only the first minSize voxels of an object are
+        // remembered, which is all that is needed to erase a small one.
+        final int[] memberZ = new int[minSize];
+        final int[] memberI = new int[minSize];
+        int[] todoZ = new int[1 << 16];
+        int[] todoI = new int[1 << 16];
+        long removed = 0;
+
+        for (int z0 = 0; z0 < nZ; z0++) {
+            final byte[] start = px[z0];
+            for (int i0 = 0; i0 < start.length; i0++) {
+                if (!isNew(start[i0])) {
+                    continue;
+                }
+                long size = 0;
+                int top = 1;
+                todoZ[0] = z0;
+                todoI[0] = i0;
+                start[i0] = SEEN;
+                while (top > 0) {
+                    top--;
+                    final int z = todoZ[top];
+                    final int i = todoI[top];
+                    if (size < minSize) {
+                        memberZ[(int) size] = z;
+                        memberI[(int) size] = i;
+                    }
+                    size++;
+                    if (top + 6 > todoZ.length) {
+                        todoZ = Arrays.copyOf(todoZ, todoZ.length * 2);
+                        todoI = Arrays.copyOf(todoI, todoI.length * 2);
+                    }
+                    final int x = i % w;
+                    final int y = i / w;
+                    if (x > 0 && isNew(px[z][i - 1])) {
+                        px[z][i - 1] = SEEN;
+                        todoZ[top] = z;
+                        todoI[top++] = i - 1;
+                    }
+                    if (x < w - 1 && isNew(px[z][i + 1])) {
+                        px[z][i + 1] = SEEN;
+                        todoZ[top] = z;
+                        todoI[top++] = i + 1;
+                    }
+                    if (y > 0 && isNew(px[z][i - w])) {
+                        px[z][i - w] = SEEN;
+                        todoZ[top] = z;
+                        todoI[top++] = i - w;
+                    }
+                    if (y < h - 1 && isNew(px[z][i + w])) {
+                        px[z][i + w] = SEEN;
+                        todoZ[top] = z;
+                        todoI[top++] = i + w;
+                    }
+                    if (z > 0 && isNew(px[z - 1][i])) {
+                        px[z - 1][i] = SEEN;
+                        todoZ[top] = z - 1;
+                        todoI[top++] = i;
+                    }
+                    if (z < nZ - 1 && isNew(px[z + 1][i])) {
+                        px[z + 1][i] = SEEN;
+                        todoZ[top] = z + 1;
+                        todoI[top++] = i;
+                    }
+                }
+                if (size < minSize) {
+                    for (int k = 0; k < size; k++) {
+                        px[memberZ[k]][memberI[k]] = 0;
+                    }
+                    removed++;
+                }
+            }
+        }
+        for (final byte[] plane : px) {
+            for (int i = 0; i < plane.length; i++) {
+                if (plane[i] == SEEN) {
+                    plane[i] = (byte) 255;
+                }
+            }
+        }
+        return removed;
+    }
+
+    private static final byte SEEN = 1;
+
+    private static boolean isNew(final byte value) {
+        return value != 0 && value != SEEN;
     }
 
     private ImagePlus assemble(final Path outDir, final String kind, final int nT, final int nZ, final String title)

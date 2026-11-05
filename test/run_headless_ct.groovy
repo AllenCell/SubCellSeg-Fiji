@@ -2,11 +2,11 @@
 // Builds a synthetic 2-channel, 2-frame hyperstack from a single 3D volume:
 //   channel 1 = noise (should NOT be segmented), channel 2 = the real data,
 //   frame 2   = frame 1 translated by 50 px in x.
-// Then runs MegaSeg on channel 2 and checks dimensions, calibration and that the
+// Then runs SubCellSeg on channel 2 and checks dimensions, calibration and that the
 // frame-2 mask is (approximately) the frame-1 mask shifted by 50 px.
 //
 //   ImageJ-win64.exe --headless --console --run test/run_headless_ct.groovy \
-//      "input='D:/data/vol.tif',outdir='D:/tmp/out',python_env='C:/.../envs/cytodl-mini'"
+//      "input='D:/data/vol.tif',outdir='D:/tmp/out',python_env='C:/.../envs/subcellseg'"
 //
 #@ String input
 #@ String outdir
@@ -18,7 +18,7 @@ import ij.ImagePlus
 import ij.ImageStack
 import ij.plugin.Duplicator
 import ij.process.StackStatistics
-import org.allencell.megaseg.fiji.MegaSegCommand
+import org.allencell.subcellseg.fiji.SubCellSegCommand
 
 new File(outdir).mkdirs()
 def src = IJ.openImage(input)
@@ -43,7 +43,7 @@ def cal = hyper.getCalibration()
 cal.pixelWidth = 0.108; cal.pixelHeight = 0.108; cal.pixelDepth = 0.29; cal.setUnit("micron")
 println("INPUT C=" + hyper.getNChannels() + " Z=" + hyper.getNSlices() + " T=" + hyper.getNFrames())
 
-def module = cmd.run(MegaSegCommand.class, true,
+def module = cmd.run(SubCellSegCommand.class, true,
         "imp", hyper, "channel", 2, "output", "Mask", "threshold", 0.5d, "min_size", 0,
         "device", "auto", "python_env", new File(python_env)).get()
 def mask = module.getOutput("mask")

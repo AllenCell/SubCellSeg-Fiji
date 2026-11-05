@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build MegaSeg_Fiji-<version>.jar without Maven, using JAVA_HOME or the JDK bundled with Fiji.
+# Build SubCellSeg_Fiji-<version>.jar without Maven, using JAVA_HOME or the JDK bundled with Fiji.
 #   ./build.sh [/path/to/Fiji.app] [--install]
 set -euo pipefail
 
@@ -30,12 +30,12 @@ find "$ROOT/src/main/java" -name '*.java' > "$BUILD/sources.txt"
 cp -r "$ROOT/src/main/resources/." "$CLASSES/"
 [[ -f "$CLASSES/META-INF/json/org.scijava.plugin.Plugin" ]] || { echo "SciJava annotation index missing"; exit 1; }
 
-JARPATH="$BUILD/MegaSeg_Fiji-$VERSION.jar"
+JARPATH="$BUILD/SubCellSeg_Fiji-$VERSION.jar"
 "$JAR" cf "$JARPATH" -C "$CLASSES" .
 echo "Built $JARPATH"
 
 if [[ $INSTALL -eq 1 ]]; then
-  rm -f "$FIJI"/plugins/MegaSeg_Fiji-*.jar
+  rm -f "$FIJI"/plugins/SubCellSeg_Fiji-*.jar
   cp "$JARPATH" "$FIJI/plugins/"
   echo "Installed into $FIJI/plugins (restart Fiji)"
 fi

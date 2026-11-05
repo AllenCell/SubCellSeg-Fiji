@@ -1,4 +1,4 @@
-package org.allencell.megaseg.fiji;
+package org.allencell.subcellseg.fiji;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 
@@ -20,13 +21,19 @@ import org.scijava.log.LogService;
  * Finds a Python interpreter, extracts the bundled bridge script and runs it,
  * relaying progress to the Fiji status bar and log.
  */
-public class MegaSegRunner {
+public class SubCellSegRunner {
 
-    public static final String BRIDGE_RESOURCE = "/megaseg_bridge.py";
-    public static final String PYTHON_ENV_VAR = "MEGASEG_PYTHON";
+    public static final String BRIDGE_RESOURCE = "/subcellseg_bridge.py";
+    public static final String PYTHON_ENV_VAR = "SUBCELLSEG_PYTHON";
+    public static final String INSTALL_URL = "https://github.com/AllenCell/SubCellSeg";
+    public static final String WEIGHTS_URL = INSTALL_URL + "/releases/tag/weights-v1";
 
-    private static final String STATUS_PREFIX = "MEGASEG_STATUS ";
-    private static final String ERROR_PREFIX = "MEGASEG_ERROR ";
+    /** Name of the environment that "uv tool install" creates for the subcellseg package. */
+    private static final String UV_TOOL_NAME = "subcellseg";
+
+    private static final String STATUS_PREFIX = "SUBCELLSEG_STATUS ";
+    private static final String ERROR_PREFIX = "SUBCELLSEG_ERROR ";
+    private static final String DONE_MARKER = "SUBCELLSEG_DONE";
     private static final int STDERR_TAIL = 40;
 
     private static final String[] PYTHON_CANDIDATES = {
@@ -37,26 +44,28 @@ public class MegaSegRunner {
     private final LogService log;
     private final StatusService status;
 
-    public MegaSegRunner(final LogService log, final StatusService status) {
+    public SubCellSegRunner(final LogService log, final StatusService status) {
         this.log = log;
         this.status = status;
     }
 
-    /** Resolve the Python executable from a folder, a file, the environment variable, or the PATH. */
+    /**
+     * Resolve the Python executable. In order: the folder or file chosen in the dialog, the
+     * SUBCELLSEG_PYTHON environment variable, the environment made by the standard SubCellSeg
+     * installation ("uv tool install"), and finally whatever "python" is on the PATH.
+     */
     public String resolvePython(final File env) {
         if (env != null && !env.getPath().trim().isEmpty()) {
             if (env.isFile()) {
                 return env.getAbsolutePath();
             }
             if (env.isDirectory()) {
-                for (final String c : PYTHON_CANDIDATES) {
-                    final File f = new File(env, c);
-                    if (f.isFile()) {
-                        return f.getAbsolutePath();
-                    }
+                final File python = pythonIn(env);
+                if (python != null) {
+                    return python.getAbsolutePath();
                 }
                 throw new IllegalArgumentException("No Python executable found inside " + env
-                        + ".\nPoint 'cytodl-mini environment' to a conda env / venv folder or directly to python(.exe).");
+                        + ".\nPoint 'Python environment' to a conda env / venv folder or directly to python(.exe).");
             }
             throw new IllegalArgumentException("Python environment does not exist: " + env);
         }
@@ -71,16 +80,58 @@ public class MegaSegRunner {
             }
             throw new IllegalArgumentException(PYTHON_ENV_VAR + " points to a missing path: " + fromEnv);
         }
+        final File tool = findUvToolPython();
+        if (tool != null) {
+            return tool.getAbsolutePath();
+        }
         return isWindows() ? "python" : "python3";
+    }
+
+    /** The Python of the environment created by "uv tool install" for SubCellSeg, or null. */
+    static File findUvToolPython() {
+        final List<File> roots = new ArrayList<>();
+        final String toolDir = System.getenv("UV_TOOL_DIR");
+        if (toolDir != null && !toolDir.trim().isEmpty()) {
+            roots.add(new File(toolDir.trim()));
+        }
+        final String appData = System.getenv("APPDATA");
+        if (isWindows() && appData != null && !appData.trim().isEmpty()) {
+            roots.add(new File(appData.trim(), "uv/tools"));
+        }
+        final String xdg = System.getenv("XDG_DATA_HOME");
+        if (xdg != null && !xdg.trim().isEmpty()) {
+            roots.add(new File(xdg.trim(), "uv/tools"));
+        }
+        roots.add(new File(System.getProperty("user.home", ""), ".local/share/uv/tools"));
+        for (final File root : roots) {
+            final File python = pythonIn(new File(root, UV_TOOL_NAME));
+            if (python != null) {
+                return python;
+            }
+        }
+        return null;
+    }
+
+    private static File pythonIn(final File dir) {
+        if (!dir.isDirectory()) {
+            return null;
+        }
+        for (final String c : PYTHON_CANDIDATES) {
+            final File f = new File(dir, c);
+            if (f.isFile()) {
+                return f;
+            }
+        }
+        return null;
     }
 
     /** Copy the bridge script from the jar into the working directory. */
     public Path extractBridge(final Path dir) throws IOException {
-        try (InputStream in = MegaSegRunner.class.getResourceAsStream(BRIDGE_RESOURCE)) {
+        try (InputStream in = SubCellSegRunner.class.getResourceAsStream(BRIDGE_RESOURCE)) {
             if (in == null) {
                 throw new IOException("Bridge script " + BRIDGE_RESOURCE + " is missing from the plugin jar.");
             }
-            final Path target = dir.resolve("megaseg_bridge.py");
+            final Path target = dir.resolve("subcellseg_bridge.py");
             Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
             return target;
         }
@@ -88,7 +139,7 @@ public class MegaSegRunner {
 
     /** Run the command, streaming stdout to the log/status bar. Throws with a readable message on failure. */
     public void run(final List<String> cmd, final Path workDir) throws IOException, InterruptedException {
-        log.info("MegaSeg command: " + String.join(" ", cmd));
+        log.info("SubCellSeg command: " + String.join(" ", cmd));
         final ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.directory(workDir.toFile());
         pb.environment().put("PYTHONUNBUFFERED", "1");
@@ -99,7 +150,7 @@ public class MegaSegRunner {
             process = pb.start();
         } catch (final IOException e) {
             throw new IOException("Could not start Python (" + cmd.get(0) + "): " + e.getMessage()
-                    + "\nSet 'cytodl-mini environment' to the folder of a conda env / venv where cytodl-mini is installed.", e);
+                    + "\n" + NOT_INSTALLED_HELP, e);
         }
 
         final Deque<String> errTail = new ArrayDeque<>();
@@ -122,7 +173,7 @@ public class MegaSegRunner {
             } catch (final IOException ignored) {
                 // process ended
             }
-        }, "megaseg-stderr");
+        }, "subcellseg-stderr");
         errThread.setDaemon(true);
         errThread.start();
 
@@ -132,12 +183,12 @@ public class MegaSegRunner {
             while ((line = r.readLine()) != null) {
                 if (line.startsWith(STATUS_PREFIX)) {
                     final String msg = line.substring(STATUS_PREFIX.length());
-                    status.showStatus("MegaSeg: " + msg);
-                    log.info("[MegaSeg] " + msg);
+                    status.showStatus("SubCellSeg: " + msg);
+                    log.info("[SubCellSeg] " + msg);
                 } else if (line.startsWith(ERROR_PREFIX)) {
                     bridgeError = line.substring(ERROR_PREFIX.length());
-                } else if (!line.trim().isEmpty()) {
-                    log.info("[cytodl-mini] " + line);
+                } else if (!line.trim().isEmpty() && !line.startsWith(DONE_MARKER)) {
+                    log.info("[python] " + line);
                 }
             }
         }
@@ -153,24 +204,31 @@ public class MegaSegRunner {
         }
     }
 
+    private static final String NOT_INSTALLED_HELP =
+            "Install SubCellSeg by following the instructions at " + INSTALL_URL + " and try again.\n"
+            + "If it is installed somewhere unusual, set 'Python environment' to that conda env / venv folder.";
+
     private static String friendlyError(final int code, final String bridgeError, final String stderrTail) {
         final StringBuilder sb = new StringBuilder();
         final String all = (bridgeError == null ? "" : bridgeError) + "\n" + stderrTail;
         if (code == 9009 || all.contains("Python was not found")) {
-            sb.append("Python was not found. Set 'cytodl-mini environment' to the folder of a conda env / venv where cytodl-mini is installed.");
-        } else if (all.contains("No module named 'cytodl_mini'") || all.contains("No module named cytodl_mini")) {
-            sb.append("cytodl-mini is not installed in the selected Python environment.\n")
-              .append("Install it with:  pip install git+https://github.com/AllenCell/CytoDL-Mini.git");
+            sb.append("Python was not found.\n").append(NOT_INSTALLED_HELP);
+        } else if (all.contains("No module named 'subcellseg'") || all.contains("No module named subcellseg")) {
+            sb.append("SubCellSeg is not installed in the Python environment that the plugin used.\n")
+              .append(NOT_INSTALLED_HELP);
         } else if (all.contains("No module named 'torch'")) {
-            sb.append("PyTorch is not installed in the selected Python environment. See https://pytorch.org/get-started/locally/");
+            sb.append("PyTorch is not installed in the selected Python environment.\n").append(NOT_INSTALLED_HELP);
         } else if (all.contains("CUDA out of memory") || all.contains("OutOfMemoryError")) {
             sb.append("The GPU ran out of memory. Try Device = cpu, or crop / downsample the image.");
-        } else if (all.contains("Failed to download checkpoint") || all.contains("GitHub CLI")) {
-            sb.append("The default checkpoint could not be downloaded. Download megaseg.ckpt manually and set 'Model checkpoint'.");
+        } else if (all.contains("Could not download the pretrained weights")
+                || all.contains("No download location is configured")) {
+            sb.append("The SubCellSeg model could not be downloaded.\n")
+              .append("Download the file subcellseg_v1.pt in a web browser from ").append(WEIGHTS_URL)
+              .append("\nand select it under 'Model checkpoint'.");
         } else if (bridgeError != null) {
             sb.append(bridgeError);
         } else {
-            sb.append("MegaSeg exited with code ").append(code).append('.');
+            sb.append("SubCellSeg exited with code ").append(code).append('.');
         }
         if (!stderrTail.isEmpty()) {
             sb.append("\n\nLast Python output:\n").append(stderrTail);
