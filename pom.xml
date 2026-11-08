@@ -13,7 +13,7 @@
 
     <groupId>org.allencell</groupId>
     <artifactId>SubCellSeg_Fiji</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
 
     <name>SubCellSeg for Fiji</name>
     <description>Fiji plugin that segments intracellular structures in 3D fluorescence volumes with SubCellSeg (via the subcellseg Python package).</description>

@@ -1,0 +1,66 @@
+# Build the plugin and run its tests on Windows, Linux and macOS, with a CPU-only
+# SubCellSeg installation (the segmentation test runs the real model on the bundled sample).
+#
+# Needs the SubCellSeg repository and its weights-v1 release to be public.
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            fiji: fiji-latest-linux64-jdk.zip
+          - os: windows-latest
+            fiji: fiji-latest-win64-jdk.zip
+          - os: macos-latest
+            fiji: fiji-latest-macos-arm64-jdk.zip
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Download Fiji
+        run: |
+          curl -sSL -o fiji.zip "https://downloads.imagej.net/fiji/latest/${{ matrix.fiji }}"
+          unzip -q fiji.zip
+          FIJI="$(ls -d Fiji.app Fiji 2>/dev/null | head -n1)"
+          echo "FIJI=$GITHUB_WORKSPACE/$FIJI" >> "$GITHUB_ENV"
+          ls "$FIJI"
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install SubCellSeg (CPU build of PyTorch)
+        run: |
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            uv tool install --python 3.12 https://github.com/AllenCell/SubCellSeg/archive/refs/heads/main.zip
+          else
+            uv tool install --python 3.12 --torch-backend cpu https://github.com/AllenCell/SubCellSeg/archive/refs/heads/main.zip
+          fi
+          "$(uv tool dir)/subcellseg/bin/python" -m subcellseg info 2>/dev/null || \
+          "$(uv tool dir)/subcellseg/Scripts/python.exe" -m subcellseg info
+
+      - name: Build and test
+        run: bash test/run_tests.sh "$FIJI"
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.os == 'ubuntu-latest'
+        with:
+          name: SubCellSeg_Fiji-jar
+          path: build/SubCellSeg_Fiji-*.jar

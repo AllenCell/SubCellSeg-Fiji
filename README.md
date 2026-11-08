@@ -12,21 +12,30 @@ The mask is the same one `subcellseg predict` gives on the command line.
 
 ## Install
 
-1. **Install SubCellSeg** (once), by following its
-   [installation instructions](https://github.com/AllenCell/SubCellSeg/blob/main/docs/INSTALL.md).
-   It is two commands in a terminal. When `subcellseg info` works there, you are done with this step.
+1. **Add the plugin to Fiji.** Copy `SubCellSeg_Fiji-<version>.jar` into `Fiji.app/plugins/` and
+   restart Fiji. (Once the update site exists: `Help › Update... › Manage Update Sites`, tick
+   *SubCellSeg*, apply, restart.) The jar works in both classic (Java 8) and current (Java 21) Fiji.
 
-2. **Add the plugin to Fiji.** Copy `SubCellSeg_Fiji-<version>.jar` into `Fiji.app/plugins/` and
-   restart Fiji. The jar is Java 8 bytecode, so it works in both classic (Java 8) and current
-   (Java 21) Fiji.
+2. **Install SubCellSeg** (once): `Plugins › Segmentation › SubCellSeg Setup...`, press OK.
+   This installs [uv](https://docs.astral.sh/uv/) if needed, then SubCellSeg with the PyTorch build
+   that matches your graphics card, and downloads the model (65 MB). It needs an internet connection
+   and a few minutes; the first install downloads up to 3 GB. A message box shows the result,
+   including whether a GPU was found.
 
-That is all: the plugin finds the SubCellSeg installation from step 1 by itself. The model
-(about 65 MB) is downloaded automatically the first time you run it.
+   Prefer a terminal? Follow the
+   [SubCellSeg installation instructions](https://github.com/AllenCell/SubCellSeg/blob/main/docs/INSTALL.md)
+   instead; the plugin finds that installation by itself.
 
-If you installed SubCellSeg another way (in a conda environment or a venv), tell the plugin where:
+3. **Try it.** `Plugins › Segmentation › SubCellSeg Sample Image` opens a small test stack
+   (nuclear speckles, SON-mEGFP, 40 slices). Then `Plugins › Segmentation › SubCellSeg...`, OK.
+
+If SubCellSeg lives in a conda environment or venv of your own, tell the plugin where:
 set **Python environment** in the dialog to that environment's folder, for example
 `C:\Users\you\anaconda3\envs\subcellseg`. It is remembered. Setting the `SUBCELLSEG_PYTHON`
 environment variable does the same.
+
+Platforms: Windows and Linux with an NVIDIA GPU (seconds per stack) or CPU (minutes); macOS runs
+on the CPU (Apple GPUs are not used yet).
 
 ## Use
 
@@ -55,6 +64,10 @@ Notes
 - 2D images run but the model is 3D, so expect weaker results.
 - RGB images are rejected; convert to a channel stack first.
 - Time-lapses: every frame is segmented independently, with the model loaded once.
+
+`Plugins › Segmentation › SubCellSeg Setup...` also updates SubCellSeg (*Install or update*),
+repairs a broken installation (*Reinstall from scratch*) and reports what is installed
+(*Check the installation*). *PyTorch build* can force a CPU-only or a specific CUDA build.
 
 ## Macro / batch
 
@@ -104,21 +117,37 @@ with Fiji (or `JAVA_HOME`):
 ```
 
 ```bash
-./build.sh /Applications/Fiji.app --install  # macOS / Linux
+./build.sh /Applications/Fiji.app --install  # macOS / Linux (also Git Bash on Windows)
 ```
 
 `pom.xml` is a standard pom-scijava project for `mvn package` and for publishing to an update site.
 
-Tests (headless). `python_env` is the folder of an environment with SubCellSeg; pass `''` to use
-the automatically found one. Add `--class-path build/SubCellSeg_Fiji-<version>.jar` after
-`ImageJ-win64.exe` to test a freshly built jar without installing it into Fiji.
+## Tests
+
+`test/run_tests.sh <Fiji.app>` builds, installs and runs the headless tests on macOS, Linux and
+Windows (Git Bash), with the current or the classic Fiji launcher. It prints `passed:` / `failed:`
+and exits non-zero on failure. Options: `--python-env DIR` (use that environment instead of the
+automatically found one), `--setup [SOURCE]` (also exercise the Setup command; set `UV_TOOL_DIR`
+to a scratch folder first to keep the test installation apart), `--skip-build`.
+
+Individual tests (`fiji` = the Fiji launcher; add `--console` with the classic `ImageJ-*` launchers):
 
 ```
-ImageJ-win64.exe --headless --console --run test/run_small_objects.groovy                                                # size filter, no Python needed
-ImageJ-win64.exe --headless --console --run test/run_headless.groovy "input='vol.tif',outdir='out',python_env='...'"
-ImageJ-win64.exe --headless --console --run test/run_headless_ct.groovy "input='vol.tif',outdir='out',python_env='...'"   # channel + time-lapse
-ImageJ-win64.exe --console --run test/run_gui_display.groovy "input='vol.tif',python_env='...'"                           # windows appear
+fiji --headless --run test/run_small_objects.groovy                              # size filter, no Python needed
+fiji --headless --run test/run_sample.groovy "python_env='',expected='test/data/SubCellSeg_sample_SON_expected_mask.tif'"
+fiji --headless --run test/run_setup.groovy "source='/path/to/SubCellSeg'"       # Setup command
+fiji --headless --run test/run_headless.groovy "input='vol.tif',outdir='out',python_env='...'"
+fiji --headless --run test/run_headless_ct.groovy "input='vol.tif',outdir='out',python_env='...'"   # channel + time-lapse
+fiji --run test/run_gui_display.groovy "input='vol.tif',python_env='...'"                           # windows appear
 ```
+
+`test/data/SubCellSeg_sample_SON_expected_mask.tif` is the GPU result on the bundled sample
+(`SubCellSeg_sample_SON_gt.tif` is the hand-curated ground truth of the same crop). The sample is a
+40 × 256 × 256 crop of `SON_136098` from the MegaSeg test set (Allen Cell Collection, hiPSC).
+
+`.github/workflows/build.yml` runs the same script on Windows, Linux and macOS runners with a
+CPU-only SubCellSeg; it needs the SubCellSeg repository and its weights release to be public.
+`docs/MAC_TEST.md` is a step-by-step recipe for testing on a Mac.
 
 ## How it works
 
@@ -135,15 +164,32 @@ run, so the Python environment only needs the `subcellseg` package itself.
 
 The Python used is, in this order: the **Python environment** set in the dialog, the
 `SUBCELLSEG_PYTHON` environment variable, the environment that `uv tool install` creates for
-SubCellSeg, and finally `python` on the PATH.
+SubCellSeg (`UV_TOOL_DIR`, `%APPDATA%\uv\tools`, `$XDG_DATA_HOME/uv/tools`, `~/.local/share/uv/tools`),
+and finally `python` on the PATH.
+
+The Setup command runs the official SubCellSeg install steps: the uv installer from `astral.sh`
+if `uv` is not on the PATH or in `~/.local/bin`, then
+`uv tool install --python 3.12 --torch-backend auto https://github.com/AllenCell/SubCellSeg/archive/refs/heads/main.zip`
+(on macOS without the `--torch-backend` flag), `python -m subcellseg info`, and the model download.
+*Install from* (advanced) accepts another archive URL or a local source folder.
+
+## Publishing (maintainers)
+
+1. Bump `<version>` in `pom.xml`; build; run `test/run_tests.sh`.
+2. Push to GitHub; the workflow builds the jar on all three platforms.
+3. Upload the jar to the *SubCellSeg* update site with the Fiji Updater (`Help › Update... › Manage
+   Update Sites › Add Unlisted Site` with your sites.imagej.net credentials, then *Advanced mode*,
+   mark the jar *Upload*). Users who enabled the site receive the new version on their next update.
+4. Tag the release and attach the jar to it for people who install by hand.
 
 ## Troubleshooting
 
 | Message | Fix |
 |---|---|
-| *Python was not found* / *SubCellSeg is not installed* | Install SubCellSeg (step 1 of Install). If it is installed in a conda env or venv, set **Python environment** to that folder. |
+| *Python was not found* / *SubCellSeg is not installed* | `Plugins › Segmentation › SubCellSeg Setup...`. If SubCellSeg is installed in a conda env or venv, set **Python environment** to that folder. |
 | *model could not be downloaded* | Download `subcellseg_v1.pt` from the [releases page](https://github.com/AllenCell/SubCellSeg/releases/tag/weights-v1) and select it under **Model checkpoint**. |
-| It is very slow | Run `subcellseg info` in a terminal. If the `gpu` line does not name your graphics card, see the SubCellSeg installation instructions. |
+| Setup fails with a download error | A firewall may block `astral.sh`, `github.com`, `pypi.org` or `download.pytorch.org`; ask IT, or install SubCellSeg from a terminal. |
+| It is very slow | `SubCellSeg Setup...` with *Check the installation*: if the `gpu` line does not name your graphics card, update the NVIDIA driver and run Setup again with *Reinstall from scratch*. |
 | *GPU ran out of memory* | Device = `cpu`, or crop the image. |
 | Nothing segmented | Check the channel; try a lower threshold and view the probability map. |
 

@@ -6,7 +6,7 @@
 #@ String input
 #@ String outdir
 #@ String python_env
-#@ Integer (value = 1) channel
+#@ Integer (value = 1, persist = false) channel
 #@ CommandService cmd
 #@ LogService log
 

@@ -5,9 +5,9 @@
 // Optional: filter a real 8-bit mask and save it, to compare with another tool:
 //   ... --run test/run_small_objects.groovy "input='mask.tif',output='filtered.tif',min_size=100"
 //
-#@ String (value = "") input
-#@ String (value = "") output
-#@ Integer (value = 100) min_size
+#@ String (value = "", persist = false) input
+#@ String (value = "", persist = false) output
+#@ Integer (value = 100, persist = false) min_size
 
 import ij.IJ
 import ij.ImageStack

@@ -369,7 +369,7 @@ public class SubCellSegCommand implements Command {
      * worker thread while an ImageJ macro waits on its own thread, so make the result the
      * current image for every thread that is executing a macro (and for this one).
      */
-    private static void registerHeadless(final ImagePlus img) {
+    static void registerHeadless(final ImagePlus img) {
         if (img == null) {
             return;
         }

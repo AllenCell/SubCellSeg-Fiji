@@ -89,6 +89,17 @@ public class SubCellSegRunner {
 
     /** The Python of the environment created by "uv tool install" for SubCellSeg, or null. */
     static File findUvToolPython() {
+        for (final File root : uvToolRoots()) {
+            final File python = pythonIn(new File(root, UV_TOOL_NAME));
+            if (python != null) {
+                return python;
+            }
+        }
+        return null;
+    }
+
+    /** Where uv keeps tool environments (UV_TOOL_DIR, then the platform default). */
+    static List<File> uvToolRoots() {
         final List<File> roots = new ArrayList<>();
         final String toolDir = System.getenv("UV_TOOL_DIR");
         if (toolDir != null && !toolDir.trim().isEmpty()) {
@@ -103,10 +114,40 @@ public class SubCellSegRunner {
             roots.add(new File(xdg.trim(), "uv/tools"));
         }
         roots.add(new File(System.getProperty("user.home", ""), ".local/share/uv/tools"));
-        for (final File root : roots) {
-            final File python = pythonIn(new File(root, UV_TOOL_NAME));
-            if (python != null) {
-                return python;
+        return roots;
+    }
+
+    static String uvToolRootsDescription() {
+        final List<String> names = new ArrayList<>();
+        for (final File root : uvToolRoots()) {
+            names.add(root.getPath());
+        }
+        return String.join(", ", names);
+    }
+
+    /**
+     * The uv executable: on the PATH, or where uv's installer puts it (~/.local/bin). Fiji started
+     * from the desktop often has a minimal PATH, hence the explicit fallback.
+     */
+    public static File findUv() {
+        final String exe = isWindows() ? "uv.exe" : "uv";
+        final String path = System.getenv("PATH");
+        if (path != null) {
+            for (final String dir : path.split(File.pathSeparator)) {
+                if (dir.trim().isEmpty()) {
+                    continue;
+                }
+                final File f = new File(dir.trim(), exe);
+                if (f.isFile()) {
+                    return f;
+                }
+            }
+        }
+        final File home = new File(System.getProperty("user.home", ""));
+        final File[] fallbacks = {new File(home, ".local/bin/" + exe), new File(home, ".cargo/bin/" + exe)};
+        for (final File f : fallbacks) {
+            if (f.isFile()) {
+                return f;
             }
         }
         return null;
@@ -205,8 +246,8 @@ public class SubCellSegRunner {
     }
 
     private static final String NOT_INSTALLED_HELP =
-            "Install SubCellSeg by following the instructions at " + INSTALL_URL + " and try again.\n"
-            + "If it is installed somewhere unusual, set 'Python environment' to that conda env / venv folder.";
+            "Run Plugins > Segmentation > SubCellSeg Setup... to install it (or follow " + INSTALL_URL + "), then try again.\n"
+            + "If SubCellSeg is already installed in a conda env / venv, set 'Python environment' to that folder.";
 
     private static String friendlyError(final int code, final String bridgeError, final String stderrTail) {
         final StringBuilder sb = new StringBuilder();
