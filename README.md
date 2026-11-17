@@ -12,8 +12,9 @@ The mask is the same one `subcellseg predict` gives on the command line.
 
 ## Install
 
-1. **Add the plugin to Fiji.** Copy `SubCellSeg_Fiji-<version>.jar` into `Fiji.app/plugins/` and
-   restart Fiji. (Once the update site exists: `Help › Update... › Manage Update Sites`, tick
+1. **Add the plugin to Fiji.** Download `SubCellSeg_Fiji-<version>.jar` from the
+   [releases page](https://github.com/AllenCell/SubCellSeg-Fiji/releases), copy it into
+   `Fiji.app/plugins/` and restart Fiji. (Once the update site exists: `Help › Update... › Manage Update Sites`, tick
    *SubCellSeg*, apply, restart.) The jar works in both classic (Java 8) and current (Java 21) Fiji.
 
 2. **Install SubCellSeg** (once): `Plugins › Segmentation › SubCellSeg Setup...`, press OK.
