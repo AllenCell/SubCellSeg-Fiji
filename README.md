@@ -125,7 +125,7 @@ with Fiji (or `JAVA_HOME`):
 
 ## Tests
 
-`test/run_tests.sh <Fiji.app>` builds, installs and runs the headless tests on macOS, Linux and
+`test/run_tests.sh <Fiji folder>` builds, installs and runs the headless tests on macOS, Linux and
 Windows (Git Bash), with the current or the classic Fiji launcher. It prints `passed:` / `failed:`
 and exits non-zero on failure. Options: `--python-env DIR` (use that environment instead of the
 automatically found one), `--setup [SOURCE]` (also exercise the Setup command; set `UV_TOOL_DIR`

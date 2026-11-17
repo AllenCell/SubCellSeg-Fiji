@@ -2,7 +2,8 @@
 # Build, install and test the SubCellSeg Fiji plugin against a Fiji installation.
 # Works on macOS, Linux and Windows (Git Bash), with the current Fiji launcher and the classic one.
 #
-#   test/run_tests.sh /Applications/Fiji.app                    # build, install, Java-only test, sample test
+#   test/run_tests.sh ~/Fiji                                    # build, install, Java-only test, sample test
+#                                                              #   (the folder that holds jars/ and plugins/)
 #   test/run_tests.sh ~/Fiji.app --python-env ~/SubCellSeg/.venv  # use a specific Python environment
 #   test/run_tests.sh ~/Fiji.app --setup [SOURCE]              # also install SubCellSeg via the Setup command
 #                                                              #   (SOURCE = archive URL or local source folder)
@@ -35,7 +36,8 @@ LAUNCHER=""
 case "$(uname -s)" in
   # fiji-windows-x64.exe is a GUI-mode program (no console output), so prefer the classic launcher on Windows.
   MINGW*|MSYS*|CYGWIN*) CANDIDATES=("$FIJI/ImageJ-win64.exe" "$FIJI/fiji-windows-x64.exe") ;;
-  Darwin) CANDIDATES=("$FIJI/Contents/MacOS/fiji" "$FIJI/Contents/MacOS/ImageJ-macosx") ;;
+  # Current macOS zips unpack to Fiji/ with a "fiji" script that finds Fiji/Fiji.app/Contents/MacOS/fiji-macos-*.
+  Darwin) CANDIDATES=("$FIJI/fiji" "$FIJI/Contents/MacOS/fiji" "$FIJI/Contents/MacOS/ImageJ-macosx") ;;
   *) CANDIDATES=("$FIJI/fiji" "$FIJI/ImageJ-linux64") ;;
 esac
 for c in "${CANDIDATES[@]}"; do

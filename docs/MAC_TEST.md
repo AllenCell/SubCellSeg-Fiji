@@ -28,9 +28,9 @@ cd ~/SubCellSeg-Fiji
 ```bash
 cd ~
 curl -sSL -o fiji.zip https://downloads.imagej.net/fiji/latest/fiji-latest-macos-arm64-jdk.zip
-unzip -q fiji.zip                       # gives ~/Fiji.app
-xattr -dr com.apple.quarantine ~/Fiji.app   # avoid the Gatekeeper "damaged app" dialog
-ls ~/Fiji.app/Contents/MacOS/           # note the launcher name (fiji, or ImageJ-macosx on classic builds)
+unzip -q fiji.zip                       # gives ~/Fiji (which contains Fiji.app, jars/, plugins/, ...)
+xattr -dr com.apple.quarantine ~/Fiji   # avoid the Gatekeeper "damaged app" dialog
+ls ~/Fiji ~/Fiji/Fiji.app/Contents/MacOS/   # note the launcher names
 ```
 
 ## 2. Automated tests
@@ -40,7 +40,7 @@ Run with a scratch uv tool directory so the test installation does not touch any
 ```bash
 cd ~/SubCellSeg-Fiji
 export UV_TOOL_DIR=~/subcellseg-test-tools
-test/run_tests.sh ~/Fiji.app --setup
+test/run_tests.sh ~/Fiji --setup
 ```
 
 The script builds and installs the jar, then runs three Fiji sessions headless. Expected
@@ -59,13 +59,13 @@ If `SETUP_OK` appears but `SAMPLE_OK` does not, run the sample test alone with t
 environment to separate "install" from "detection" problems:
 
 ```bash
-test/run_tests.sh ~/Fiji.app --skip-build --python-env "$UV_TOOL_DIR/subcellseg"
+test/run_tests.sh ~/Fiji --skip-build --python-env "$UV_TOOL_DIR/subcellseg"
 ```
 
 ## 3. Manual check of the dialogs
 
 ```bash
-open ~/Fiji.app
+open ~/Fiji/Fiji.app
 ```
 
 1. `Plugins › Segmentation › SubCellSeg Sample Image` opens a 40-slice stack.
@@ -78,7 +78,7 @@ open ~/Fiji.app
 ## 4. What to report back
 
 - the complete terminal output of step 3 (or at least the last 60 lines of each Fiji session);
-- `~/Fiji.app/Contents/MacOS/` listing and macOS version (`sw_vers`);
+- `~/Fiji` and `~/Fiji/Fiji.app/Contents/MacOS/` listings and macOS version (`sw_vers`);
 - `$UV_TOOL_DIR/subcellseg/bin/python -m subcellseg info`;
 - the elapsed time printed on the `MASK ... elapsed=` line;
 - the screenshots from step 4 and anything that looked wrong.

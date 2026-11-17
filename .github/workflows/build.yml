@@ -38,7 +38,10 @@ jobs:
         run: |
           curl -sSL -o fiji.zip "https://downloads.imagej.net/fiji/latest/${{ matrix.fiji }}"
           unzip -q fiji.zip
-          FIJI="$(ls -d Fiji.app Fiji 2>/dev/null | head -n1)"
+          # Current zips unpack to "Fiji", older ones to "Fiji.app".
+          FIJI=""
+          for d in Fiji Fiji.app; do [[ -d "$d" ]] && FIJI="$d" && break; done
+          [[ -n "$FIJI" ]] || { echo "No Fiji folder after unzip:"; ls; exit 1; }
           echo "FIJI=$GITHUB_WORKSPACE/$FIJI" >> "$GITHUB_ENV"
           ls "$FIJI"
 
