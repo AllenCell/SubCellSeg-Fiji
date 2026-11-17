@@ -87,6 +87,13 @@ public class SubCellSegSetupCommand implements Command {
                     + "or a local folder that holds the SubCellSeg source code.")
     private String source = DEFAULT_SOURCE;
 
+    @Parameter(label = "Install location", required = false,
+            description = "Leave empty to use uv's standard per-user folders. If the installation fails with "
+                    + "'This program is blocked by group policy' (managed Windows PCs often refuse to run programs "
+                    + "from the user profile), put a folder inside the Fiji folder here, e.g. <Fiji>/subcellseg. "
+                    + "The plugin remembers it.")
+    private String install_dir = "";
+
     /** Human-readable summary of what was done, or "FAILED: ..." . */
     @Parameter(type = ItemIO.OUTPUT)
     private String report;
@@ -131,7 +138,8 @@ public class SubCellSegSetupCommand implements Command {
             stream(cmd, "uv installer");
             uv = SubCellSegRunner.findUv();
             if (uv == null) {
-                throw new IOException("uv was installed but cannot be found in " + new File(home(), ".local/bin")
+                throw new IOException("uv was installed but cannot be found in "
+                        + (installDir() != null ? new File(installDir(), "bin") : new File(home(), ".local/bin"))
                         + ".\nOpen a terminal, run 'uv --version', and if that works please report this problem.");
             }
             summary.append("Installed uv (").append(uv).append(")\n");
@@ -147,6 +155,11 @@ public class SubCellSegSetupCommand implements Command {
         cmd.add("--python");
         cmd.add(PYTHON_VERSION);
         cmd.add("--force");   // replace a stale "subcellseg" launcher left by an earlier installation
+        if (installDir() != null) {
+            // Never pick up a Python from elsewhere: it could live in a folder that is not allowed to run.
+            cmd.add("--python-preference");
+            cmd.add("only-managed");
+        }
         if (!isMac()) {
             // PyTorch has no CUDA builds for macOS; the default PyPI build is the right one there.
             cmd.add("--torch-backend");
@@ -163,7 +176,11 @@ public class SubCellSegSetupCommand implements Command {
 
         status.showStatus("SubCellSeg Setup: " + (present ? "updating" : "installing") + " SubCellSeg (this takes a few minutes)...");
         stream(cmd, "uv");
+        rememberInstallDir();
         summary.append(present ? "Updated" : "Installed").append(" SubCellSeg from ").append(source.trim()).append('\n');
+        if (installDir() != null) {
+            summary.append("Install location: ").append(installDir()).append('\n');
+        }
 
         if (SubCellSegRunner.findUvToolPython() == null) {
             throw new IOException("SubCellSeg was installed, but its Python environment was not found where the "
@@ -171,6 +188,21 @@ public class SubCellSegSetupCommand implements Command {
                     + "Run 'uv tool dir' in a terminal and set 'Python environment' in the SubCellSeg dialog to "
                     + "<that folder>" + File.separator + PACKAGE + ".");
         }
+    }
+
+    /** The custom install location from the dialog, or null for uv's defaults. */
+    File installDir() {
+        return install_dir == null || install_dir.trim().isEmpty() ? null : new File(install_dir.trim()).getAbsoluteFile();
+    }
+
+    /**
+     * Store (or clear) the custom install location in the ImageJ preferences, so that the segmentation
+     * command and later Setup runs find the environment there.
+     */
+    private void rememberInstallDir() {
+        final File dir = installDir();
+        ij.Prefs.set(SubCellSegRunner.INSTALL_DIR_PREF, dir == null ? "" : dir.getPath());
+        ij.Prefs.savePreferences();
     }
 
     /** The requirement passed to uv: the source, with the [all] extra when asked for. */
@@ -260,10 +292,20 @@ public class SubCellSegSetupCommand implements Command {
         final int code = p.waitFor();
         if (code != 0) {
             final String text = String.join("\n", tail);
-            final boolean network = text.toLowerCase().matches("(?s).*(download|network|connect|request|timed out|tls|certificate).*");
-            throw new IOException(label + " failed (exit code " + code + "). Last output:\n" + text
-                    + (network ? "\n\nIf a download was blocked, your IT department may need to allow astral.sh, "
-                    + "github.com, pypi.org and download.pytorch.org." : ""));
+            final String lower = text.toLowerCase();
+            final boolean policy = lower.matches("(?s).*(group policy|os error 1260|blocked by).*");
+            final boolean network = lower.matches("(?s).*(download|network|connect|request|timed out|tls|certificate).*");
+            String hint = "";
+            if (policy) {
+                final File fiji = SubCellSegRunner.fijiInstallDir();
+                hint = "\n\nThis computer does not allow programs to run from the user profile folder. Run Setup again "
+                        + "with 'Install location' set to a folder inside the Fiji folder"
+                        + (fiji != null ? ", e.g. " + fiji.getPath() : "") + ".";
+            } else if (network) {
+                hint = "\n\nIf a download was blocked, your IT department may need to allow astral.sh, "
+                        + "github.com, pypi.org and download.pytorch.org.";
+            }
+            throw new IOException(label + " failed (exit code " + code + "). Last output:\n" + text + hint);
         }
     }
 
@@ -284,10 +326,21 @@ public class SubCellSegSetupCommand implements Command {
         return p.waitFor();
     }
 
-    private static Process start(final List<String> cmd) throws IOException {
+    private Process start(final List<String> cmd) throws IOException {
         final ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.redirectErrorStream(true);
         pb.directory(home());
+        final File dir = installDir();
+        if (dir != null) {
+            // Keep everything uv creates (its own binary, Pythons, tool environments, launchers, cache)
+            // under the chosen folder; the per-user defaults may not be allowed to run programs.
+            dir.mkdirs();
+            pb.environment().put("UV_INSTALL_DIR", new File(dir, "bin").getPath());
+            pb.environment().put("UV_TOOL_BIN_DIR", new File(dir, "bin").getPath());
+            pb.environment().put("UV_TOOL_DIR", new File(dir, "tools").getPath());
+            pb.environment().put("UV_PYTHON_INSTALL_DIR", new File(dir, "python").getPath());
+            pb.environment().put("UV_CACHE_DIR", new File(dir, "cache").getPath());
+        }
         pb.environment().put("PYTHONUNBUFFERED", "1");
         pb.environment().put("PYTHONIOENCODING", "utf-8");
         pb.environment().put("UV_NO_PROGRESS", "1");       // plain lines instead of progress bars

@@ -7,6 +7,7 @@
 #   test/run_tests.sh ~/Fiji.app --setup [SOURCE]              # also install SubCellSeg via the Setup command
 #                                                              #   (SOURCE = archive URL or local source folder)
 #   test/run_tests.sh ~/Fiji.app --skip-build                  # test the jar that is already installed
+#   test/run_tests.sh ~/Fiji.app --setup --install-dir DIR     # Setup with a custom "Install location"
 #
 # Exit code 0 when every test printed its OK marker.
 set -uo pipefail
@@ -15,15 +16,16 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Git Bash on Windows: Fiji is a Windows program, so give it D:/... paths rather than /d/... ones.
 case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) ROOT="$(cygpath -m "$ROOT")" ;; esac
 FIJI="${1:-}"
-[[ -n "$FIJI" && -d "$FIJI" ]] || { echo "usage: $0 <Fiji.app> [--python-env DIR] [--setup [SOURCE]] [--skip-build]"; exit 2; }
+[[ -n "$FIJI" && -d "$FIJI" ]] || { echo "usage: $0 <Fiji.app> [--python-env DIR] [--setup [SOURCE]] [--install-dir DIR] [--skip-build]"; exit 2; }
 shift
 
-PYENV=""; SETUP=0; SOURCE="https://github.com/AllenCell/SubCellSeg/archive/refs/heads/main.zip"; BUILD=1
+PYENV=""; SETUP=0; SOURCE="https://github.com/AllenCell/SubCellSeg/archive/refs/heads/main.zip"; BUILD=1; INSTALL_DIR=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --python-env) PYENV="$2"; shift 2 ;;
     --setup) SETUP=1; shift; if [[ $# -gt 0 && "$1" != --* ]]; then SOURCE="$1"; shift; fi ;;
     --skip-build) BUILD=0; shift ;;
+    --install-dir) INSTALL_DIR="$2"; shift 2 ;;
     *) echo "unknown option $1"; exit 2 ;;
   esac
 done
@@ -70,11 +72,16 @@ cd "$ROOT"
 run_fiji SMALL_OBJECTS_OK test/run_small_objects.groovy
 
 if [[ $SETUP -eq 1 ]]; then
-  run_fiji SETUP_OK test/run_setup.groovy "source='$SOURCE',download_model=true"
+  run_fiji SETUP_OK test/run_setup.groovy "source='$SOURCE',download_model=true,install_dir='$INSTALL_DIR'"
 fi
 
 EXPECTED="$ROOT/test/data/SubCellSeg_sample_SON_expected_mask.tif"
 run_fiji SAMPLE_OK test/run_sample.groovy "python_env='$PYENV',expected='$EXPECTED',outdir='$ROOT/test/out_sample'"
+
+if [[ -n "$INSTALL_DIR" ]]; then
+  # The Setup command remembered the test install location in the ImageJ preferences; forget it again.
+  "$LAUNCHER" --headless "${CONSOLE[@]}" --run test/clear_install_dir.groovy >/dev/null 2>&1
+fi
 
 echo; echo "=== summary"
 echo "passed: ${PASS[*]:-none}"

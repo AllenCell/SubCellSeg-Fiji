@@ -27,6 +27,8 @@ public class SubCellSegRunner {
     public static final String PYTHON_ENV_VAR = "SUBCELLSEG_PYTHON";
     public static final String INSTALL_URL = "https://github.com/AllenCell/SubCellSeg";
     public static final String WEIGHTS_URL = INSTALL_URL + "/releases/tag/weights-v1";
+    /** ImageJ preference that remembers a custom "Install location" chosen in the Setup command. */
+    public static final String INSTALL_DIR_PREF = "subcellseg.install_dir";
 
     /** Name of the environment that "uv tool install" creates for the subcellseg package. */
     private static final String UV_TOOL_NAME = "subcellseg";
@@ -98,9 +100,29 @@ public class SubCellSegRunner {
         return null;
     }
 
-    /** Where uv keeps tool environments (UV_TOOL_DIR, then the platform default). */
+    /**
+     * A custom install location: the folder the user chose in the Setup command (remembered in the ImageJ
+     * preferences), else null. The Setup command puts uv's Python, tool environments and launchers in there
+     * when the per-user default folders are not allowed to run programs (managed Windows PCs).
+     */
+    public static File customInstallDir() {
+        final String pref = ij.Prefs.get(INSTALL_DIR_PREF, "");
+        return pref == null || pref.trim().isEmpty() ? null : new File(pref.trim());
+    }
+
+    /** The install location suggested to users whose profile folders are locked down: {@code <Fiji>/subcellseg}. */
+    public static File fijiInstallDir() {
+        final String fiji = ij.IJ.getDirectory("imagej");
+        return fiji == null ? null : new File(fiji, "subcellseg");
+    }
+
+    /** Where uv keeps tool environments (custom install location, UV_TOOL_DIR, then the platform default). */
     static List<File> uvToolRoots() {
         final List<File> roots = new ArrayList<>();
+        final File custom = customInstallDir();
+        if (custom != null) {
+            roots.add(new File(custom, "tools"));
+        }
         final String toolDir = System.getenv("UV_TOOL_DIR");
         if (toolDir != null && !toolDir.trim().isEmpty()) {
             roots.add(new File(toolDir.trim()));
@@ -114,6 +136,10 @@ public class SubCellSegRunner {
             roots.add(new File(xdg.trim(), "uv/tools"));
         }
         roots.add(new File(System.getProperty("user.home", ""), ".local/share/uv/tools"));
+        final File fiji = fijiInstallDir();
+        if (fiji != null) {
+            roots.add(new File(fiji, "tools"));
+        }
         return roots;
     }
 
@@ -144,7 +170,17 @@ public class SubCellSegRunner {
             }
         }
         final File home = new File(System.getProperty("user.home", ""));
-        final File[] fallbacks = {new File(home, ".local/bin/" + exe), new File(home, ".cargo/bin/" + exe)};
+        final List<File> fallbacks = new ArrayList<>();
+        final File custom = customInstallDir();
+        if (custom != null) {
+            fallbacks.add(new File(custom, "bin/" + exe));
+        }
+        fallbacks.add(new File(home, ".local/bin/" + exe));
+        fallbacks.add(new File(home, ".cargo/bin/" + exe));
+        final File fiji = fijiInstallDir();
+        if (fiji != null) {
+            fallbacks.add(new File(fiji, "bin/" + exe));
+        }
         for (final File f : fallbacks) {
             if (f.isFile()) {
                 return f;

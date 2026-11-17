@@ -128,7 +128,8 @@ with Fiji (or `JAVA_HOME`):
 Windows (Git Bash), with the current or the classic Fiji launcher. It prints `passed:` / `failed:`
 and exits non-zero on failure. Options: `--python-env DIR` (use that environment instead of the
 automatically found one), `--setup [SOURCE]` (also exercise the Setup command; set `UV_TOOL_DIR`
-to a scratch folder first to keep the test installation apart), `--skip-build`.
+to a scratch folder first to keep the test installation apart), `--install-dir DIR` (exercise the
+*Install location* option; the preference is cleared again afterwards), `--skip-build`.
 
 Individual tests (`fiji` = the Fiji launcher; add `--console` with the classic `ImageJ-*` launchers):
 
@@ -164,14 +165,18 @@ run, so the Python environment only needs the `subcellseg` package itself.
 
 The Python used is, in this order: the **Python environment** set in the dialog, the
 `SUBCELLSEG_PYTHON` environment variable, the environment that `uv tool install` creates for
-SubCellSeg (`UV_TOOL_DIR`, `%APPDATA%\uv\tools`, `$XDG_DATA_HOME/uv/tools`, `~/.local/share/uv/tools`),
-and finally `python` on the PATH.
+SubCellSeg (the *Install location* chosen in Setup, `UV_TOOL_DIR`, `%APPDATA%\uv\tools`,
+`$XDG_DATA_HOME/uv/tools`, `~/.local/share/uv/tools`, `<Fiji>/subcellseg/tools`), and finally
+`python` on the PATH.
 
 The Setup command runs the official SubCellSeg install steps: the uv installer from `astral.sh`
 if `uv` is not on the PATH or in `~/.local/bin`, then
 `uv tool install --python 3.12 --torch-backend auto https://github.com/AllenCell/SubCellSeg/archive/refs/heads/main.zip`
 (on macOS without the `--torch-backend` flag), `python -m subcellseg info`, and the model download.
-*Install from* (advanced) accepts another archive URL or a local source folder.
+*Install from* (advanced) accepts another archive URL or a local source folder. *Install location*
+(advanced) moves everything uv creates (uv itself, Python, the environment, launchers, cache) into one
+folder, for computers that refuse to run programs from the user profile; it is remembered in the
+ImageJ preferences (`subcellseg.install_dir`).
 
 ## Publishing (maintainers)
 
@@ -189,6 +194,7 @@ if `uv` is not on the PATH or in `~/.local/bin`, then
 | *Python was not found* / *SubCellSeg is not installed* | `Plugins › Segmentation › SubCellSeg Setup...`. If SubCellSeg is installed in a conda env or venv, set **Python environment** to that folder. |
 | *model could not be downloaded* | Download `subcellseg_v1.pt` from the [releases page](https://github.com/AllenCell/SubCellSeg/releases/tag/weights-v1) and select it under **Model checkpoint**. |
 | Setup fails with a download error | A firewall may block `astral.sh`, `github.com`, `pypi.org` or `download.pytorch.org`; ask IT, or install SubCellSeg from a terminal. |
+| Setup fails with *This program is blocked by group policy* (os error 1260) | The computer does not allow programs to run from the user profile (`AppData`). Run Setup again with **Install location** set to a folder inside the Fiji folder, e.g. `C:\Fiji.app\subcellseg`; Fiji already runs from there, so it is allowed. |
 | It is very slow | `SubCellSeg Setup...` with *Check the installation*: if the `gpu` line does not name your graphics card, update the NVIDIA driver and run Setup again with *Reinstall from scratch*. |
 | *GPU ran out of memory* | Device = `cpu`, or crop the image. |
 | Nothing segmented | Check the channel; try a lower threshold and view the probability map. |
