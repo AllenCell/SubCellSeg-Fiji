@@ -67,7 +67,7 @@ run_fiji() {  # run_fiji <marker> <script> [params]
 
 if [[ $BUILD -eq 1 ]]; then
   echo "=== build + install"
-  "$ROOT/build.sh" "$FIJI" --install || { echo "BUILD FAILED"; exit 1; }
+  bash "$ROOT/build.sh" "$FIJI" --install || { echo "BUILD FAILED"; exit 1; }   # bash: the exec bit may be lost on checkout
 fi
 
 cd "$ROOT"

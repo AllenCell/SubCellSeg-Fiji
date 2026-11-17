@@ -12,10 +12,17 @@ The mask is the same one `subcellseg predict` gives on the command line.
 
 ## Install
 
-1. **Add the plugin to Fiji.** Download `SubCellSeg_Fiji-<version>.jar` from the
-   [releases page](https://github.com/AllenCell/SubCellSeg-Fiji/releases), copy it into
-   `Fiji.app/plugins/` and restart Fiji. (Once the update site exists: `Help › Update... › Manage Update Sites`, tick
-   *SubCellSeg*, apply, restart.) The jar works in both classic (Java 8) and current (Java 21) Fiji.
+1. **Add the plugin to Fiji** through its update site: `Help › Update...` › **Manage Update Sites** ›
+   **Add Unlisted Site**, enter
+
+   | Name | URL |
+   |---|---|
+   | `SubCellSeg` | `https://allencell.github.io/SubCellSeg-Fiji/` |
+
+   then **Apply and Close**, **Apply Changes**, and restart Fiji. Fiji keeps the plugin up to date from
+   then on. (Without the Updater: download `SubCellSeg_Fiji-<version>.jar` from the
+   [releases page](https://github.com/AllenCell/SubCellSeg-Fiji/releases) into Fiji's `plugins/`
+   folder and restart.) The jar works in both classic (Java 8) and current (Java 21) Fiji.
 
 2. **Install SubCellSeg** (once): `Plugins › Segmentation › SubCellSeg Setup...`, press OK.
    This installs [uv](https://docs.astral.sh/uv/) if needed, then SubCellSeg with the PyTorch build
@@ -181,12 +188,23 @@ ImageJ preferences (`subcellseg.install_dir`).
 
 ## Publishing (maintainers)
 
-1. Bump `<version>` in `pom.xml`; build; run `test/run_tests.sh`.
-2. Push to GitHub; the workflow builds the jar on all three platforms.
-3. Upload the jar to the *SubCellSeg* update site with the Fiji Updater (`Help › Update... › Manage
-   Update Sites › Add Unlisted Site` with your sites.imagej.net credentials, then *Advanced mode*,
-   mark the jar *Upload*). Users who enabled the site receive the new version on their next update.
-4. Tag the release and attach the jar to it for people who install by hand.
+1. Bump `<version>` in `pom.xml`, run `test/run_tests.sh`, commit, push. The `build` workflow
+   builds and tests the jar on Windows, Linux and macOS.
+2. Tag it: `git tag v<version> && git push origin v<version>`. The `release` workflow builds the
+   jar, publishes it to the update site and creates a GitHub release with the jar attached.
+   Users who follow the site get the new version at their next `Help › Update...`.
+
+The update site is the `gh-pages` branch of this repository, served by GitHub Pages at
+`https://allencell.github.io/SubCellSeg-Fiji/`. Its files (`db.xml.gz`, `plugins/*.jar-<timestamp>`)
+are written by the Fiji Updater itself, never by hand: the workflow points a fresh Fiji at the site
+with the Updater's `file:` upload protocol (`--update edit-update-site SubCellSeg <url> file:localhost
+<checkout of gh-pages>/`), drops the new jar into `plugins/` and runs
+`--update upload-complete-site --force SubCellSeg`. The same commands work locally with the Fiji
+launcher if the workflow is ever unavailable.
+
+To make *SubCellSeg* appear in the Updater's built-in list (a checkbox instead of *Add Unlisted
+Site*), open a pull request adding it to `sites.yml` in
+[imagej/list-of-update-sites](https://github.com/imagej/list-of-update-sites).
 
 ## Troubleshooting
 

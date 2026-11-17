@@ -59,6 +59,14 @@ jobs:
           "$(uv tool dir)/subcellseg/bin/python" -m subcellseg info 2>/dev/null || \
           "$(uv tool dir)/subcellseg/Scripts/python.exe" -m subcellseg info
 
+      - name: Pre-download the model weights (with retries)
+        # The sample test needs them; fetching here with retries avoids flaky GitHub download errors.
+        run: |
+          mkdir -p ~/.cache/subcellseg
+          curl -sSL --retry 8 --retry-all-errors --retry-delay 10 \
+            -o ~/.cache/subcellseg/subcellseg_v1.pt https://github.com/AllenCell/SubCellSeg/releases/download/weights-v1/subcellseg_v1.pt
+          ls -la ~/.cache/subcellseg
+
       - name: Build and test
         run: bash test/run_tests.sh "$FIJI"
 
