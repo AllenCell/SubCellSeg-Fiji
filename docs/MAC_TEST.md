@@ -33,31 +33,14 @@ xattr -dr com.apple.quarantine ~/Fiji.app   # avoid the Gatekeeper "damaged app"
 ls ~/Fiji.app/Contents/MacOS/           # note the launcher name (fiji, or ImageJ-macosx on classic builds)
 ```
 
-## 2. While the SubCellSeg repository is still internal
-
-Skip this section once `https://github.com/AllenCell/SubCellSeg` is public.
-
-```bash
-brew install gh 2>/dev/null || true     # or download gh from https://cli.github.com
-gh auth login
-gh repo clone AllenCell/SubCellSeg ~/SubCellSeg
-mkdir -p ~/.cache/subcellseg
-gh release download weights-v1 -R AllenCell/SubCellSeg -p subcellseg_v1.pt -D ~/.cache/subcellseg
-```
-
-Then use `~/SubCellSeg` as the install source below instead of the GitHub archive URL.
-
-## 3. Automated tests
+## 2. Automated tests
 
 Run with a scratch uv tool directory so the test installation does not touch anything else:
 
 ```bash
 cd ~/SubCellSeg-Fiji
 export UV_TOOL_DIR=~/subcellseg-test-tools
-# public repo:
 test/run_tests.sh ~/Fiji.app --setup
-# internal repo (section 2):
-test/run_tests.sh ~/Fiji.app --setup ~/SubCellSeg
 ```
 
 The script builds and installs the jar, then runs three Fiji sessions headless. Expected
@@ -79,7 +62,7 @@ environment to separate "install" from "detection" problems:
 test/run_tests.sh ~/Fiji.app --skip-build --python-env "$UV_TOOL_DIR/subcellseg"
 ```
 
-## 4. Manual check of the dialogs
+## 3. Manual check of the dialogs
 
 ```bash
 open ~/Fiji.app
@@ -92,7 +75,7 @@ open ~/Fiji.app
    a message box with the `subcellseg info` lines appears.
 4. Take a screenshot of the SubCellSeg dialog and of the mask next to the sample.
 
-## 5. What to report back
+## 4. What to report back
 
 - the complete terminal output of step 3 (or at least the last 60 lines of each Fiji session);
 - `~/Fiji.app/Contents/MacOS/` listing and macOS version (`sw_vers`);
@@ -102,7 +85,6 @@ open ~/Fiji.app
 
 ## Prompt for an agent
 
-> In `~/SubCellSeg-Fiji` follow `docs/MAC_TEST.md` from section 1 to section 3 (and section 2 if
-> `gh repo view AllenCell/SubCellSeg --json visibility` does not say PUBLIC). Do not change any
+> In `~/SubCellSeg-Fiji` follow `docs/MAC_TEST.md` from section 1 to section 3. Do not change any
 > source file; if a step fails, collect the error and continue with the remaining steps where
-> possible. Finish with the report listed in section 5, including the exact commands that failed.
+> possible. Finish with the report listed in section 4, including the exact commands that failed.
