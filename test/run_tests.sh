@@ -47,8 +47,9 @@ if [[ -z "$LAUNCHER" ]]; then
   LAUNCHER="$(ls "$FIJI"/fiji-* "$FIJI"/Contents/MacOS/fiji-* 2>/dev/null | head -n1 || true)"
 fi
 [[ -n "$LAUNCHER" ]] || { echo "No Fiji launcher found in $FIJI"; exit 2; }
-CONSOLE=()
-[[ "$LAUNCHER" == *ImageJ-* ]] && CONSOLE=(--console)   # classic launcher needs --console to print
+CONSOLE=""
+[[ "$LAUNCHER" == *ImageJ-* ]] && CONSOLE="--console"   # classic launcher needs --console to print
+# (a plain string, not an array: macOS ships bash 3.2, where an empty array trips "set -u")
 echo "Fiji launcher: $LAUNCHER"
 
 PASS=(); FAIL=()
@@ -57,9 +58,9 @@ run_fiji() {  # run_fiji <marker> <script> [params]
   echo; echo "=== $script ${params}"
   local out
   if [[ -n "$params" ]]; then
-    out="$("$LAUNCHER" --headless "${CONSOLE[@]}" --run "$script" "$params" 2>&1)"
+    out="$("$LAUNCHER" --headless $CONSOLE --run "$script" "$params" 2>&1)"
   else
-    out="$("$LAUNCHER" --headless "${CONSOLE[@]}" --run "$script" 2>&1)"
+    out="$("$LAUNCHER" --headless $CONSOLE --run "$script" 2>&1)"
   fi
   echo "$out" | grep -v -E "^\s*$" | tail -n 40
   if grep -q "$marker" <<<"$out"; then PASS+=("$marker"); else FAIL+=("$marker"); fi
@@ -82,7 +83,7 @@ run_fiji SAMPLE_OK test/run_sample.groovy "python_env='$PYENV',expected='$EXPECT
 
 if [[ -n "$INSTALL_DIR" ]]; then
   # The Setup command remembered the test install location in the ImageJ preferences; forget it again.
-  "$LAUNCHER" --headless "${CONSOLE[@]}" --run test/clear_install_dir.groovy >/dev/null 2>&1
+  "$LAUNCHER" --headless $CONSOLE --run test/clear_install_dir.groovy >/dev/null 2>&1
 fi
 
 echo; echo "=== summary"
