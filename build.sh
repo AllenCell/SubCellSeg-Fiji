@@ -28,6 +28,10 @@ case "$(uname -s)" in
   *) SEP=":"; winpath() { printf '%s' "$1"; } ;;
 esac
 echo "Using javac: $JAVAC"
+# JDK 23+ no longer runs annotation processors unless asked; the SciJava plugin index depends on one.
+PROC=()
+JV="$("$JAVAC" -version 2>&1 | sed -E 's/^javac ([0-9]+).*//')"
+if [[ "$JV" =~ ^[0-9]+$ && "$JV" -ge 23 ]]; then PROC=(-proc:full); fi
 
 VERSION="$(sed -n 's:.*<version>\(.*\)</version>.*:\1:p' "$ROOT/pom.xml" | sed -n 2p)"
 BUILD="$ROOT/build"; CLASSES="$BUILD/classes"
@@ -35,7 +39,7 @@ rm -rf "$BUILD"; mkdir -p "$CLASSES"
 
 CP="$(winpath "$FIJI/jars")/*${SEP}$(winpath "$FIJI/plugins")/*"
 find "$ROOT/src/main/java" -name '*.java' | while read -r f; do winpath "$f"; echo; done > "$BUILD/sources.txt"
-"$JAVAC" -source 8 -target 8 -encoding UTF-8 -nowarn -cp "$CP" -d "$(winpath "$CLASSES")" @"$(winpath "$BUILD/sources.txt")"
+"$JAVAC" ${PROC[@]+"${PROC[@]}"} -source 8 -target 8 -encoding UTF-8 -nowarn -cp "$CP" -d "$(winpath "$CLASSES")" @"$(winpath "$BUILD/sources.txt")"
 
 cp -r "$ROOT/src/main/resources/." "$CLASSES/"
 [[ -f "$CLASSES/META-INF/json/org.scijava.plugin.Plugin" ]] || { echo "SciJava annotation index missing"; exit 1; }

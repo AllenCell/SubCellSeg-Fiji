@@ -31,6 +31,11 @@ jobs:
           ref: gh-pages
           path: site
 
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
       - name: Download Fiji
         run: |
           curl -sSL -o fiji.zip https://downloads.imagej.net/fiji/latest/fiji-latest-linux64-jdk.zip
