@@ -68,9 +68,11 @@ test/run_tests.sh ~/Fiji --skip-build --python-env "$UV_TOOL_DIR/subcellseg"
 open ~/Fiji/Fiji.app
 ```
 
-1. `Plugins › Segmentation › SubCellSeg Sample Image` opens a 40-slice stack.
-2. `Plugins › Segmentation › SubCellSeg...`: leave everything at its defaults, OK. The status bar shows
-   progress; a window `SubCellSeg_sample_SON_SubCellSeg_mask` appears after a minute or two.
+1. `File › Open Samples › SubCellSeg nuclear speckles (3D)` opens a 40-slice stack.
+2. `Plugins › Segmentation › SubCellSeg...`: leave everything at its defaults, OK. If the engine was
+   not installed by the automated tests, a first-run dialog offers to install it: accept. The status
+   bar shows progress; a window `SubCellSeg_sample_SON_SubCellSeg_mask` appears after a minute or two.
+   Also try it with no image open: the command offers to open the sample.
 3. `Plugins › Segmentation › SubCellSeg Setup...` with *Action* = `Check the installation`, OK:
    a message box with the `subcellseg info` lines appears.
 4. Take a screenshot of the SubCellSeg dialog and of the mask next to the sample.

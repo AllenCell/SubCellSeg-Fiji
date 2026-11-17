@@ -24,18 +24,19 @@ The mask is the same one `subcellseg predict` gives on the command line.
    [releases page](https://github.com/AllenCell/SubCellSeg-Fiji/releases) into Fiji's `plugins/`
    folder and restart.) The jar works in both classic (Java 8) and current (Java 21) Fiji.
 
-2. **Install SubCellSeg** (once): `Plugins › Segmentation › SubCellSeg Setup...`, press OK.
-   This installs [uv](https://docs.astral.sh/uv/) if needed, then SubCellSeg with the PyTorch build
-   that matches your graphics card, and downloads the model (65 MB). It needs an internet connection
-   and a few minutes; the first install downloads up to 3 GB. A message box shows the result,
-   including whether a GPU was found.
+2. **Segment.** Open a 3D stack, or the bundled test stack under `File › Open Samples ›
+   SubCellSeg nuclear speckles (3D)`, then `Plugins › Segmentation › SubCellSeg...`, OK.
+
+   On the first run the plugin notices that SubCellSeg's Python engine is missing and offers to
+   install it: [uv](https://docs.astral.sh/uv/), SubCellSeg with the PyTorch build that matches your
+   graphics card, and the model (65 MB). Accept; it needs an internet connection and a few minutes
+   (up to 3 GB of downloads), and the segmentation starts as soon as it is done.
 
    Prefer a terminal? Follow the
    [SubCellSeg installation instructions](https://github.com/AllenCell/SubCellSeg/blob/main/docs/INSTALL.md)
-   instead; the plugin finds that installation by itself.
-
-3. **Try it.** `Plugins › Segmentation › SubCellSeg Sample Image` opens a small test stack
-   (nuclear speckles, SON-mEGFP, 40 slices). Then `Plugins › Segmentation › SubCellSeg...`, OK.
+   instead; the plugin finds that installation by itself. `Plugins › Segmentation › SubCellSeg
+   Setup...` checks, updates or reinstalls the engine and has an *Install location* option for
+   locked-down computers.
 
 If SubCellSeg lives in a conda environment or venv of your own, tell the plugin where:
 set **Python environment** in the dialog to that environment's folder, for example

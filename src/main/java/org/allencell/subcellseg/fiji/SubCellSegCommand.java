@@ -49,7 +49,7 @@ public class SubCellSegCommand implements Command {
     @Parameter
     private StatusService status;
 
-    @Parameter(label = "Image")
+    @Parameter(label = "Image", required = false)
     private ImagePlus imp;
 
     // ------------------------------------------------------------------ SubCellSeg parameters
@@ -113,6 +113,14 @@ public class SubCellSegCommand implements Command {
         final long t0 = System.currentTimeMillis();
         Path work = null;
         try {
+            if (imp == null || imp.getWidth() == 0 || imp.getProcessor() == null) {
+                // null in the GUI; headless SciJava may hand over an empty placeholder ImagePlus instead
+                imp = imageOrSample();
+                if (imp == null) {
+                    return;   // the user declined the sample image
+                }
+            }
+            ensureEngine();
             work = Files.createTempDirectory("subcellseg_fiji_");
             runInternal(work);
             deleteRecursively(work);
@@ -132,6 +140,60 @@ public class SubCellSegCommand implements Command {
             final String where = work == null ? "" : "\n\nTemporary files kept for inspection in:\n" + work;
             IJ.error("SubCellSeg", e.getMessage() + where);
         }
+    }
+
+    private static boolean interactive() {
+        return !GraphicsEnvironment.isHeadless() && !IJ.macroRunning() && !Interpreter.isBatchMode();
+    }
+
+    /**
+     * No image was open: offer to open the bundled sample (GUI only). Returns null if the user
+     * declines; throws in headless / macro mode, where a dialog is not an option.
+     */
+    private ImagePlus imageOrSample() throws IOException {
+        if (!interactive()) {
+            throw new IllegalArgumentException("No image is open.");
+        }
+        final boolean yes = IJ.showMessageWithCancel("SubCellSeg",
+                "No image is open.\n \n"
+                + "Open the bundled sample image (nuclear speckles, SON-mEGFP, 40 slices) and segment it?\n"
+                + "It is also available under File > Open Samples > SubCellSeg nuclear speckles (3D).");
+        if (!yes) {
+            return null;
+        }
+        final ImagePlus sample = SubCellSegSampleCommand.open();
+        sample.show();
+        return sample;
+    }
+
+    /**
+     * First run: if no SubCellSeg Python environment can be found and the user did not point the
+     * plugin at one, offer to install it right away (what "SubCellSeg Setup..." does with its
+     * defaults). In headless / macro mode nothing is asked; the run fails with the usual help text.
+     */
+    private void ensureEngine() throws Exception {
+        if (python_env != null && !python_env.getPath().trim().isEmpty()) {
+            return;
+        }
+        final String fromEnv = System.getenv(SubCellSegRunner.PYTHON_ENV_VAR);
+        if (fromEnv != null && !fromEnv.trim().isEmpty()) {
+            return;
+        }
+        if (SubCellSegRunner.findUvToolPython() != null || !interactive()) {
+            return;
+        }
+        final boolean yes = IJ.showMessageWithCancel("SubCellSeg: first run",
+                "SubCellSeg's Python engine (PyTorch and the model) is not installed yet.\n \n"
+                + "Install it now? This downloads up to 3 GB and takes a few minutes;\n"
+                + "the segmentation starts as soon as it is done. Progress appears in the\n"
+                + "status bar and the Log window.\n \n"
+                + "Press Cancel if SubCellSeg is already installed somewhere else: the plugin\n"
+                + "then uses 'python' from the PATH, or the folder set under 'Python environment'.");
+        if (!yes) {
+            return;
+        }
+        final String report = SubCellSegSetupCommand.quickInstall(log, status);
+        log.info("SubCellSeg Setup:\n" + report);
     }
 
     private void runInternal(final Path work) throws IOException, InterruptedException {

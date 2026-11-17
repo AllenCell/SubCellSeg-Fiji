@@ -73,6 +73,7 @@ fi
 
 cd "$ROOT"
 run_fiji SMALL_OBJECTS_OK test/run_small_objects.groovy
+run_fiji NOIMAGE_OK test/run_noimage.groovy
 
 if [[ $SETUP -eq 1 ]]; then
   run_fiji SETUP_OK test/run_setup.groovy "source='$SOURCE',download_model=true,install_dir='$INSTALL_DIR'"

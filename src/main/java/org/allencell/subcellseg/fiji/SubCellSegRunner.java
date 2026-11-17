@@ -282,7 +282,8 @@ public class SubCellSegRunner {
     }
 
     private static final String NOT_INSTALLED_HELP =
-            "Run Plugins > Segmentation > SubCellSeg Setup... to install it (or follow " + INSTALL_URL + "), then try again.\n"
+            "Run Plugins > Segmentation > SubCellSeg... again and accept the installation offer, or use "
+            + "Plugins > Segmentation > SubCellSeg Setup... (or follow " + INSTALL_URL + "), then try again.\n"
             + "If SubCellSeg is already installed in a conda env / venv, set 'Python environment' to that folder.";
 
     private static String friendlyError(final int code, final String bridgeError, final String stderrTail) {

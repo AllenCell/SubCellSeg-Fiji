@@ -21,7 +21,7 @@ import org.scijava.plugin.Plugin;
  * can be tried in one click: nuclear speckles (SON-mEGFP) in a hiPSC colony,
  * 40 x 256 x 256 voxels at 0.108 x 0.108 x 0.29 um, from the Allen Cell Collection.
  */
-@Plugin(type = Command.class, menuPath = "Plugins>Segmentation>SubCellSeg Sample Image", headless = true,
+@Plugin(type = Command.class, menuPath = "File>Open Samples>SubCellSeg nuclear speckles (3D)", headless = true,
         description = "Open a small 3D test volume (nuclear speckles, SON-mEGFP) to try SubCellSeg on.")
 public class SubCellSegSampleCommand implements Command {
 

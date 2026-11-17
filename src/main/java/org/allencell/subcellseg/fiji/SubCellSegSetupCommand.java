@@ -128,7 +128,51 @@ public class SubCellSegSetupCommand implements Command {
 
     // ------------------------------------------------------------------ steps
 
+    /**
+     * Install SubCellSeg with the defaults (GPU auto-detection, model download), as the segmentation
+     * command does on its first run. Returns the report text; throws with a readable message on failure.
+     */
+    static String quickInstall(final LogService log, final StatusService status) throws Exception {
+        final SubCellSegSetupCommand setup = new SubCellSegSetupCommand();
+        setup.log = log;
+        setup.status = status;
+        final StringBuilder summary = new StringBuilder();
+        setup.install(summary);
+        final String python = setup.pythonForCheck(false);
+        setup.info(python, summary);
+        setup.downloadModel(python, summary);
+        status.showStatus("SubCellSeg installed");
+        return summary.toString().trim();
+    }
+
+    private static boolean isPolicyError(final Exception e) {
+        final String m = e.getMessage() == null ? "" : e.getMessage().toLowerCase();
+        return m.matches("(?s).*(group policy|os error 1260|blocked by).*");
+    }
+
+    /**
+     * Install, and if the computer refuses to run programs from the user profile (managed Windows
+     * PCs), try again with everything placed inside the Fiji folder, which evidently may run programs.
+     */
     private void install(final StringBuilder summary) throws IOException, InterruptedException {
+        try {
+            installOnce(summary);
+        } catch (final IOException e) {
+            final File fiji = SubCellSegRunner.fijiInstallDir();
+            if (installDir() != null || fiji == null || !isPolicyError(e)) {
+                throw e;
+            }
+            log.warn("SubCellSeg Setup: " + e.getMessage());
+            log.warn("SubCellSeg Setup: the user profile folder may not run programs here; retrying inside " + fiji);
+            summary.append("Programs may not run from the user profile on this computer; installed into ")
+                   .append(fiji).append(" instead.\n");
+            status.showStatus("SubCellSeg Setup: retrying inside the Fiji folder...");
+            install_dir = fiji.getPath();
+            installOnce(summary);
+        }
+    }
+
+    private void installOnce(final StringBuilder summary) throws IOException, InterruptedException {
         File uv = SubCellSegRunner.findUv();
         if (uv == null) {
             status.showStatus("SubCellSeg Setup: installing uv...");
@@ -298,9 +342,12 @@ public class SubCellSegSetupCommand implements Command {
             String hint = "";
             if (policy) {
                 final File fiji = SubCellSegRunner.fijiInstallDir();
-                hint = "\n\nThis computer does not allow programs to run from the user profile folder. Run Setup again "
-                        + "with 'Install location' set to a folder inside the Fiji folder"
-                        + (fiji != null ? ", e.g. " + fiji.getPath() : "") + ".";
+                hint = installDir() == null
+                        ? "\n\nThis computer does not allow programs to run from the user profile folder. Run Setup again "
+                          + "with 'Install location' set to a folder inside the Fiji folder"
+                          + (fiji != null ? ", e.g. " + fiji.getPath() : "") + "."
+                        : "\n\nThis computer does not allow programs to run from " + installDir() + " either. Ask your "
+                          + "IT department which folders may run programs and use one of them as 'Install location'.";
             } else if (network) {
                 hint = "\n\nIf a download was blocked, your IT department may need to allow astral.sh, "
                         + "github.com, pypi.org and download.pytorch.org.";
